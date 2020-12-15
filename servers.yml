@@ -45,6 +45,34 @@ Resources:
         ToPort: 65535
         CidrIp: 0.0.0.0/0
 
+  WebAppS3ReadOnlyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 's3:GetObject'
+                Resource: '*'
+
+  WebAppInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      Roles:
+        - !Ref 'WebAppS3ReadOnlyRole'
+        
   WebAppLaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
@@ -52,14 +80,16 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           apt-get update -y
-          apt-get install apache2 -y
+          apt-get install unzip awscli apache2 -y
           systemctl start apache2.service
           cd /var/www/html
-          echo "Udacity Demo Web Server Up and Running!" > index.html
+          aws s3 cp s3://udacity-devops-p2/webapp.zip .
+          unzip -o webapp.zip
       ImageId: ami-0885b1f6bd170450c
       SecurityGroups:
       - Ref: WebServerSecurityGroup
       InstanceType: t3.micro
+      IamInstanceProfile: !Ref 'WebAppInstanceProfile'
       BlockDeviceMappings:
       - DeviceName: "/dev/sdk"
         Ebs:
